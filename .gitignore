@@ -39,6 +39,9 @@ yarn-error.log*
 # Optional local MCP dev tool (clone separately if needed)
 mailjet-mcp-server/
 
+# Supabase CLI local temp (machine-specific)
+supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
