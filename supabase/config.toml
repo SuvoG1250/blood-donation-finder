@@ -1,0 +1,29 @@
+project_id = "ptagaqlnxpaubnxpxbqg"
+
+[functions.approve-donor]
+verify_jwt = false
+
+[functions.reject-donor]
+verify_jwt = false
+
+[functions.lock-donor]
+verify_jwt = false
+
+[functions.delete-donor]
+verify_jwt = false
+
+[functions.admin-manage-admins]
+verify_jwt = false
+
+[functions.bulk-expire-open-emergencies]
+verify_jwt = false
+
+[functions.post-emergency]
+verify_jwt = false
+
+[functions.notify-donors-on-emergency]
+verify_jwt = false
+
+[functions.donor-registration-received]
+verify_jwt = false
+

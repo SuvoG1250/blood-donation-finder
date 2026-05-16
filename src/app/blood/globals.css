@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a; /* slate-900 */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #060814;
+    --foreground: #e5e7eb; /* gray-200 */
+  }
+}
+
+body {
+  background: radial-gradient(
+      900px circle at 15% 0%,
+      rgb(239 68 68 / 0.12),
+      transparent 45%
+    ),
+    radial-gradient(
+      700px circle at 80% 10%,
+      rgb(244 63 94 / 0.10),
+      transparent 50%
+    ),
+    linear-gradient(180deg, var(--background), var(--background));
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+a {
+  color: inherit;
+}
+
+*::selection {
+  background: rgb(244 63 94 / 0.25);
+}

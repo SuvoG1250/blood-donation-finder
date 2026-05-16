@@ -1,0 +1,466 @@
+📍 District: Hooghly
+Block: Arambagh
+Arandi I
+Arandi II
+Batanal
+Harinkhola I
+Harinkhola II
+Mayapur
+Salepur I
+Salepur II
+Tirtha
+Block: Goghat I
+Bali
+Goghat
+Kayapat
+Raghubati
+Block: Goghat II
+Badanganj-Falui I
+Badanganj-Falui II
+Bengai
+Kamarpukur
+Block: Khanakul I
+Arunda I
+Arunda II
+Balipur
+Radhanagar
+Block: Khanakul II
+Dhanyaghori
+Natibpur I
+Natibpur II
+Sabalsinghpur
+📍 District: Bankura
+Block: Indpur
+Bagda
+Indpur
+Banshichandrapur
+Raghunathpur
+Block: Bishnupur
+Ajodhya
+Dwarika
+Radhanagar
+
+
+📍 District: Hooghly (Remaining Blocks)
+Block: Pandua
+Bantikabainchi
+Gurap
+Haral
+Pandua
+Simlagarh
+Block: Polba-Dadpur
+Dadpur
+Makalpur
+Polba
+Sugandha
+Block: Pursurah
+Bhangamora
+Pursurah
+Srirampur
+Block: Tarakeswar
+Bhanjipur
+Champadanga
+Tarakeswar
+Talpur
+Block: Dhaniakhali
+Belmuri
+Dashghara
+Gurap
+Somaspur
+Block: Balagarh
+Balagarh
+Ektarpur
+Jirat
+📍 District: Bankura (More Blocks)
+Block: Bankura I
+Andharthole
+Jagadalla
+Kankata
+Kenjakura
+Block: Bankura II
+Bikna
+Junbedia
+Sanbandha
+Block: Barjora
+Barjora
+Chhandar
+Ghutgoria
+Block: Chhatna
+Arrah
+Chhatna
+Jirabaid
+Block: Gangajalghati
+Gangajalghati
+Kapista
+Pirraboni
+Block: Indas
+Akui
+Indas
+Karisunda
+📍 District: Purba Medinipur (Start)
+Block: Tamluk
+Anantapur I
+Anantapur II
+Nilkunthia
+Block: Panskura I
+Gopimohanpur
+Panskura
+Raghunathbari
+Block: Panskura II
+Baichberia
+Keshapat
+Raghunathpur
+
+📍 District: Purba Medinipur (More)
+Block: Nandakumar
+Basudevpur
+Byabattarhat Paschim
+Kumarchak
+Block: Moyna
+Bakcha
+Gojina
+Moyna
+Block: Kolaghat
+Amalhanda
+Brindabanchak
+Khanyadihi
+Block: Haldia
+Baruttarhingli
+Debhog
+Sutahata
+Block: Contai I
+Majilapur
+Nayaput
+Raipur-Paschimchak
+Block: Contai II
+Amardanagar
+Brajalalchak
+Sarada
+📍 District: Paschim Medinipur
+Block: Midnapore
+Barkola
+Jadupur
+Panchkhuri
+Block: Kharagpur I
+Barkola
+Gokulpur
+Kalaikunda
+Block: Kharagpur II
+Lachhmapur
+Madpur
+Sankoa
+Block: Debra
+Balichak
+Debra
+Satyapur
+Block: Pingla
+Gobardhanpur
+Pingla
+Pindrui
+Block: Sabang
+Bishnupur
+Sabang
+Dashgram
+📍 District: Howrah
+Block: Amta I
+Amta
+Bhandargachha
+Sirajbati
+Block: Amta II
+Amta
+Jhikira
+Tajpur
+Block: Bagnan I
+Bagnan
+Haturia
+Khalore
+Block: Bagnan II
+Antila
+Bainan
+Chandrapur
+Block: Uluberia I
+Hatgacha
+Uluberia
+Chandipur
+Block: Uluberia II
+Baniban
+Joypur
+Khalisani
+📍 District: South 24 Parganas
+Block: Baruipur
+Belegachhi
+Hardaha
+South Garia
+Block: Bhangar I
+Bhangar
+Chandaneswar
+Pranganj
+Block: Bhangar II
+Bamunia
+Beonta
+Jagulgachhi
+Block: Canning I
+Canning
+Dighirpar
+Matla I
+Block: Canning II
+Atharobanki
+Deuli I
+Tambuldaha I
+Block: Jaynagar I
+Dhosa
+Rajapur
+Uttar Barasat
+Block: Jaynagar II
+Baishata
+Kulta
+Mayahowri
+Block: Mathurapur I
+Dakshin Barasat
+Mathurapur
+Nalua
+Block: Mathurapur II
+Gilarchat
+Kumrapara
+Nandakumarpur
+📍 District: North 24 Parganas
+Block: Barasat I
+Kadambagachi
+Kotra
+Duttapukur
+Block: Barasat II
+Chandigoriya
+Shasan
+Rajarhat
+Block: Deganga
+Amulia
+Berachampa
+Sohai
+Block: Habra I
+Habra
+Machhlandapur
+Kumra
+Block: Habra II
+Ashokenagar
+Bhurkunda
+Gourbanga
+Block: Bongaon
+Bongaon
+Kalupur
+Petrapole
+📍 District: Nadia
+Block: Krishnanagar I
+Bhatjangla
+Dogachi
+Joania
+Block: Krishnanagar II
+Dhubulia
+Noapara
+Sadhanpara
+Block: Ranaghat I
+Habibpur
+Payradanga
+Tarapur
+Block: Ranaghat II
+Bahirgachhi
+Majhergram
+Nokari
+Block: Chakdaha
+Chakdaha
+Dewli
+Hingara
+Block: Berhampore
+Beldanga I
+Beldanga II
+Naoda
+Block: Kandi
+Kandi
+Khoshbagh
+Gokarna
+Block: Domkal
+Bhagirathpur
+Domkal
+Madhurkul
+Block: Jalangi
+Choapara
+Jalangi
+Sadikhander
+Block: Raninagar I
+Herampur
+Islampurchak
+Raninagar
+Block: Raninagar II
+Katlamari I
+Katlamari II
+Rajapur
+📍 District: Birbhum
+Block: Bolpur-Sriniketan
+Ballavpur
+Kasba
+Ruppur
+Block: Suri I
+Alunda
+Karidhya
+Tilpara
+Block: Suri II
+Domdama
+Kotasur
+Purandarpur
+Block: Rampurhat I
+Dakbanglow
+Kasthogara
+Narayanpur
+Block: Rampurhat II
+Bishnupur
+Margram
+Satpalsa
+Block: Nalhati I
+Banior
+Nalhati
+Paikar
+📍 District: Malda
+Block: English Bazar
+Amriti
+Jadupur
+Narhatta
+Block: Old Malda
+Jatradanga
+Mangalbari
+Muchia
+Block: Kaliachak I
+Alinagar
+Kaliachak
+Silampur
+Block: Kaliachak II
+Bangitola
+Hamidpur
+Rathbari
+Block: Kaliachak III
+Charianantapur
+Krishnapur
+Sahapur
+Block: Gazole
+Alal
+Gazole
+Pandua
+🚀 FULL LIST (PART 6 – FINAL)
+📍 District: Uttar Dinajpur
+Block: Raiganj
+Bahin
+Birghai
+Rampur
+Block: Hemtabad
+Bangalbari
+Hemtabad
+Naoda
+Block: Kaliaganj
+Dhankoil
+Mustafanagar
+Radhikapur
+Block: Islampur
+Agdimti-Khanti
+Gunjaria
+Matikunda
+📍 District: Dakshin Dinajpur
+Block: Balurghat
+Amritakhanda
+Chingisapur
+Najirpur
+Block: Gangarampur
+Ashokegram
+Basuria
+Belbari
+Block: Kumarganj
+Batun
+Deor
+Safanagar
+Block: Tapan
+Dwipkhanda
+Hazratpur
+Ramchandrapur
+📍 District: Cooch Behar
+Block: Cooch Behar I
+Chandamari
+Guriahati
+Pundibari
+Block: Cooch Behar II
+Ambari
+Baneswar
+Khagrabari
+Block: Dinhata I
+Bhetaguri
+Dinhata
+Okrabari
+Block: Dinhata II
+Bamanhat
+Chowdhurihat
+Sahebganj
+Block: Mathabhanga I
+Gopalpur
+Hazrahat
+Pachagarh
+📍 District: Jalpaiguri
+Block: Jalpaiguri
+Arabinda
+Bahadur
+Kharia
+Block: Rajganj
+Binnaguri
+Fulbari
+Sukhani
+Block: Maynaguri
+Domohani
+Madhabdanga
+Sapti Bari
+📍 District: Alipurduar
+Block: Alipurduar I
+Chakowakheti
+Paschim Jitpur
+Salkumar
+Block: Alipurduar II
+Chaparerpar I
+Chaparerpar II
+Majherdabri
+Block: Falakata
+Dalgaon
+Falakata
+Jateswar
+📍 District: Darjeeling
+Block: Darjeeling Pulbazar
+Badamtam
+Lebong
+Rangli
+Block: Kurseong
+Chimney
+Seokbir
+Sittong
+Block: Matigara
+Atharakhai
+Champasari
+Matigara
+📍 District: Kalimpong
+Block: Kalimpong I
+Algara
+Gitdabling
+Kalimpong
+Block: Kalimpong II
+Gorubathan
+Lava
+Pedong
+📍 District: Purulia
+Block: Purulia I
+Arsha
+Garh Joypur
+Lagda
+Block: Purulia II
+Belma
+Bongabari
+Hutmura
+Block: Raghunathpur I
+Arrah
+Neturia
+Sanka
+Block: Raghunathpur II
+Cheliyama
+Joradih
+Nildih
