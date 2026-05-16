@@ -52,31 +52,38 @@ async function fetchDonorRows(
   bloodGroup: string,
   eligibilityCutoffIso: string,
 ): Promise<{ rows: DonorDbRow[]; error: string | null }> {
-  const selects = [
-    `${DONOR_SELECT_SAFE},pause_until`,
-    DONOR_SELECT_SAFE,
-  ];
+  const withPause = await admin
+    .from("donors")
+    .select(`${DONOR_SELECT_SAFE},pause_until`)
+    .eq("id_card_verified", true)
+    .lte("last_donation_date", eligibilityCutoffIso)
+    .ilike("blood_group", bloodGroup)
+    .order("name", { ascending: true })
+    .limit(2000)
+    .returns<DonorDbRow[]>();
 
-  for (const selectCols of selects) {
-    const { data, error } = await admin
-      .from("donors")
-      .select(selectCols)
-      .eq("id_card_verified", true)
-      .lte("last_donation_date", eligibilityCutoffIso)
-      .ilike("blood_group", bloodGroup)
-      .order("name", { ascending: true })
-      .limit(2000);
-
-    if (!error) {
-      const rows = Array.isArray(data) ? (data as unknown as DonorDbRow[]) : [];
-      return { rows, error: null };
-    }
-    if (!isMissingColumnError(error.message ?? "")) {
-      return { rows: [], error: error.message ?? "Search failed." };
-    }
+  if (!withPause.error) {
+    return { rows: withPause.data ?? [], error: null };
+  }
+  if (!isMissingColumnError(withPause.error.message ?? "")) {
+    return { rows: [], error: withPause.error.message ?? "Search failed." };
   }
 
-  return { rows: [], error: "Unable to load donors from database." };
+  const withoutPause = await admin
+    .from("donors")
+    .select(DONOR_SELECT_SAFE)
+    .eq("id_card_verified", true)
+    .lte("last_donation_date", eligibilityCutoffIso)
+    .ilike("blood_group", bloodGroup)
+    .order("name", { ascending: true })
+    .limit(2000)
+    .returns<DonorDbRow[]>();
+
+  if (!withoutPause.error) {
+    return { rows: withoutPause.data ?? [], error: null };
+  }
+
+  return { rows: [], error: withoutPause.error.message ?? "Unable to load donors from database." };
 }
 
 export async function POST(req: Request) {
