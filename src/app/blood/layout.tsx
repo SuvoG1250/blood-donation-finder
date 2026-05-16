@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import AdminAuthButton from "@/components/AdminAuthButton";
 import PwaRegister from "@/components/PwaRegister";
@@ -205,6 +207,8 @@ export default function RootLayout({
         </nav>
 
         <PwaRegister />
+        <Analytics />
+        <SpeedInsights />
 
         <footer className="border-t bg-white/50">
           <div className="mx-auto w-full max-w-6xl px-4 py-6 text-xs text-zinc-500 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
