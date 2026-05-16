@@ -68,7 +68,8 @@ async function fetchDonorRows(
       .limit(2000);
 
     if (!error) {
-      return { rows: (data as DonorDbRow[]) ?? [], error: null };
+      const rows = Array.isArray(data) ? (data as unknown as DonorDbRow[]) : [];
+      return { rows, error: null };
     }
     if (!isMissingColumnError(error.message ?? "")) {
       return { rows: [], error: error.message ?? "Search failed." };
