@@ -1,6 +1,7 @@
 /** West Bengal pincode data — local india-pincode DB with optional remote fallback. */
 
 import { getIndiaPincode, type PostOffice as IndiaPostOffice } from "india-pincode";
+import { resolveWbBlock } from "@/lib/resolveWbBlock";
 
 export const WB_STATE_LABEL = "West Bengal";
 
@@ -48,11 +49,26 @@ export function isWestBengalState(state: string | null | undefined): boolean {
 }
 
 export function normalizeBlock(po: PostalPostOffice): string {
+  const district = (po.District ?? "").trim();
+  const locality = (po.Name ?? "").trim();
+  const resolved = resolveWbBlock(district, locality, {
+    postalBlock: po.Block,
+    division: po.Division,
+    taluk: po.Description ?? undefined,
+  });
+  if (resolved) return resolved;
+
   const block = (po.Block ?? "").trim();
-  if (block && block.toUpperCase() !== "NA") return block;
-  const division = (po.Division ?? "").trim();
-  if (division) return division.replace(/\s+Division$/i, "").trim() || division;
-  return (po.Region ?? "").trim();
+  const districtKey = district.toLowerCase().replace(/\s+/g, "");
+  if (
+    block &&
+    block.toUpperCase() !== "NA" &&
+    block.toLowerCase().replace(/\s+/g, "") !== districtKey
+  ) {
+    return block;
+  }
+
+  return "";
 }
 
 export function postOfficeToAddress(
@@ -87,11 +103,13 @@ function titleCaseWords(value: string): string {
 
 function indiaRecordToPostal(po: IndiaPostOffice): PostalPostOffice {
   const division = (po.division ?? "").trim();
+  const district = titleCaseWords(po.district);
+  const locality = (po.area ?? "").trim();
   return {
-    Name: po.area,
-    District: titleCaseWords(po.district),
+    Name: locality,
+    District: district,
     State: titleCaseWords(po.state),
-    Block: division.replace(/\s+Division$/i, "").trim() || titleCaseWords(po.district),
+    Block: resolveWbBlock(district, locality, { division }),
     Division: division,
     Region: (po.region ?? "").trim(),
     Circle: (po.circle ?? "").trim(),
@@ -198,15 +216,19 @@ async function fetchPincodeOfficesRemote(pincode: string): Promise<PostalPostOff
   const rows = payload.data ?? [];
   return dedupeOffices(
     filterWestBengalOffices(
-      rows.map((row) => ({
-        Name: (row.office ?? "").trim(),
-        District: titleCaseWords(row.district ?? ""),
+      rows.map((row) => {
+        const district = titleCaseWords(row.district ?? "");
+        const locality = (row.office ?? "").replace(/\s+B\.?O\.?$/i, "").trim();
+        return {
+        Name: locality,
+        District: district,
         State: titleCaseWords(row.state ?? ""),
-        Block: titleCaseWords(row.district ?? ""),
+        Block: resolveWbBlock(district, locality),
         Pincode: (row.pincode ?? pincode).trim(),
         BranchType: row.officeType ?? "",
         DeliveryStatus: row.delivery ? "Delivery" : "Non-Delivery",
-      })),
+      };
+      }),
     ),
   );
 }

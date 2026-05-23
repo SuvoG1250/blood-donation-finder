@@ -266,7 +266,7 @@ export default function WbAddressFields({
           className={inputClass}
           value={addr.block}
           onChange={(e) => patchAddress({ block: e.target.value })}
-          placeholder="Auto-filled from PIN"
+          placeholder="Auto-filled from post office (e.g. Khanakul I)"
           required
         />
       </label>
