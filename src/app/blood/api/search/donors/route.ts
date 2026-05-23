@@ -12,7 +12,7 @@ function json(data: unknown, status = 200) {
 
 /** Columns that exist on all deployed schemas (no trusted_donor / is_trusted). */
 const DONOR_SELECT_SAFE =
-  "user_id,name,photo_object_path,blood_group,district,block,panchayat,village,last_donation_date,contact_number,preferred_days,preferred_time_slots";
+  "user_id,name,photo_object_path,blood_group,district,block,panchayat,village,pincode,last_donation_date,contact_number,preferred_days,preferred_time_slots";
 
 type DonorDbRow = DonorSearchRow & {
   pause_until?: string | null;
@@ -28,6 +28,7 @@ function mapDbRow(row: DonorDbRow): DonorSearchRow {
     block: row.block,
     panchayat: row.panchayat,
     village: row.village,
+    pincode: row.pincode,
     last_donation_date: row.last_donation_date,
     contact_number: row.contact_number,
     preferred_days: row.preferred_days,
@@ -112,7 +113,8 @@ export async function POST(req: Request) {
   }
 
   const address = normalizeWbAddress(body.address);
-  const validation = validateWbAddressForSearch(address);
+  const searchScope = body.searchScope ?? "block";
+  const validation = validateWbAddressForSearch(address, { searchScope });
   if (!validation.ok) {
     return json({ error: validation.error ?? "Invalid address." }, 400);
   }
@@ -137,6 +139,7 @@ export async function POST(req: Request) {
   const donors = filterDonorSearchRows(rows, {
     bloodGroup,
     address,
+    searchScope,
     preferredDay: body.preferredDay,
     preferredTimeSlot: body.preferredTimeSlot,
   });

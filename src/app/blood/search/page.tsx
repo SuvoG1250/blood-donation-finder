@@ -7,6 +7,11 @@ import { ensureSupabase, getSupabaseOrNull } from "@/lib/supabaseClient";
 import WbAddressFields, { emptyWbAddress, type WbAddressValue } from "@/components/WbAddressFields";
 import { normalizeWbAddress } from "@/lib/wbAddress";
 import {
+  DONOR_SEARCH_SCOPES,
+  describeSearchScope,
+  type DonorSearchScope,
+} from "@/lib/donorSearchScope";
+import {
   buildDonorSearchQueryParams,
   parseDonorSearchParams,
   searchDonorsByAddress,
@@ -49,6 +54,8 @@ type SavedSearchPreset = {
   id: string;
   label: string;
   bg: string;
+  searchScope?: DonorSearchScope;
+  pincode: string;
   district: string;
   block: string;
   panchayat: string;
@@ -78,6 +85,7 @@ export default function SearchPage() {
   const [bloodGroups, setBloodGroups] = useState<BloodGroupRow[]>([]);
 
   const [address, setAddress] = useState<WbAddressValue>(emptyWbAddress);
+  const [searchScope, setSearchScope] = useState<DonorSearchScope>("block");
   const [addressError, setAddressError] = useState<string | null>(null);
 
   const [preferredDay, setPreferredDay] = useState("");
@@ -107,20 +115,29 @@ export default function SearchPage() {
       "Hello {{donor_name}}, I am {{requester}}. Please tell me when you can donate (day/time). Needed: {{blood_group}}. Location: {{district}}, {{block}}{{panchayat_line}}{{village_line}}.",
   });
 
-  const runBlockDonorSearch = useCallback(
-    async (opts?: { addressOverride?: WbAddressValue; bloodGroupOverride?: string }) => {
+  const runDonorSearch = useCallback(
+    async (opts?: {
+      addressOverride?: WbAddressValue;
+      bloodGroupOverride?: string;
+      searchScopeOverride?: DonorSearchScope;
+    }) => {
       const bg = (opts?.bloodGroupOverride ?? bloodGroup).trim();
       const loc = normalizeWbAddress(opts?.addressOverride ?? address);
+      const scope = opts?.searchScopeOverride ?? searchScope;
 
       if (!bg) {
         setError("Please select a blood group first.");
         return;
       }
-      if (!loc.district.trim() || !loc.block.trim()) {
+      if (!loc.district.trim()) {
+        return;
+      }
+      if (scope !== "pincode" && !loc.block.trim()) {
         return;
       }
 
       setError(null);
+      setAddressError(null);
       setLoading(true);
       setResults([]);
 
@@ -133,17 +150,12 @@ export default function SearchPage() {
         return;
       }
 
-      syncQueryInAddressBar();
+      syncQueryInAddressBar(scope, loc, bg);
 
-      // Block-wide: all panchayats in district + block (ignore optional locality field).
-      const blockWide: WbAddressValue = {
-        ...loc,
-        panchayat: "",
-        village: "",
-      };
       const { donors, error: searchError } = await searchDonorsByAddress(supabase, {
         bloodGroup: bg,
-        address: blockWide,
+        address: loc,
+        searchScope: scope,
         preferredDay,
         preferredTimeSlot,
       });
@@ -155,7 +167,7 @@ export default function SearchPage() {
       }
       setResults(donors);
     },
-    [address, bloodGroup, preferredDay, preferredTimeSlot],
+    [address, bloodGroup, preferredDay, preferredTimeSlot, searchScope],
   );
 
   useEffect(() => {
@@ -211,17 +223,26 @@ export default function SearchPage() {
   const handleLocationResolved = useCallback(
     (loc: WbAddressValue) => {
       const normalized = normalizeWbAddress(loc);
+      if (normalized.village.trim() && searchScope === "block") {
+        setSearchScope("village");
+      }
       setAddress(normalized);
       if (!bloodGroup.trim()) {
-        setError("Location set. Now select a blood group to see donors in this block.");
+        setError("Location set. Select a blood group, then search.");
         return;
       }
-      const key = `${bloodGroup}|${normalized.pincode}|${normalized.district}|${normalized.block}`;
+      const scopeForSearch =
+        normalized.village.trim() && searchScope === "block" ? "village" : searchScope;
+      const key = `${bloodGroup}|${scopeForSearch}|${normalized.pincode}|${normalized.district}|${normalized.block}|${normalized.village}`;
       if (key === lastAutoSearchKey.current) return;
       lastAutoSearchKey.current = key;
-      void runBlockDonorSearch({ addressOverride: normalized, bloodGroupOverride: bloodGroup });
+      void runDonorSearch({
+        addressOverride: normalized,
+        bloodGroupOverride: bloodGroup,
+        searchScopeOverride: scopeForSearch,
+      });
     },
-    [bloodGroup, runBlockDonorSearch],
+    [bloodGroup, runDonorSearch, searchScope],
   );
 
   useEffect(() => {
@@ -242,6 +263,7 @@ export default function SearchPage() {
     queueMicrotask(() => {
       if (parsed.bloodGroup) setBloodGroup(parsed.bloodGroup);
       setAddress(parsed.address);
+      setSearchScope(parsed.searchScope);
       if (parsed.preferredDay) setPreferredDay(parsed.preferredDay);
       if (parsed.preferredTimeSlot) setPreferredTimeSlot(parsed.preferredTimeSlot);
     });
@@ -251,16 +273,22 @@ export default function SearchPage() {
     const params = buildDonorSearchQueryParams({
       bloodGroup,
       address,
+      searchScope,
       preferredDay,
       preferredTimeSlot,
     });
     return `${window.location.origin}/search${params.toString() ? `?${params.toString()}` : ""}`;
   }
 
-  function syncQueryInAddressBar() {
+  function syncQueryInAddressBar(
+    scope: DonorSearchScope,
+    loc: WbAddressValue,
+    bg: string,
+  ) {
     const params = buildDonorSearchQueryParams({
-      bloodGroup,
-      address,
+      bloodGroup: bg,
+      address: loc,
+      searchScope: scope,
       preferredDay,
       preferredTimeSlot,
     });
@@ -271,7 +299,7 @@ export default function SearchPage() {
   async function onSearch(e: React.FormEvent) {
     e.preventDefault();
     lastAutoSearchKey.current = "";
-    await runBlockDonorSearch();
+    await runDonorSearch();
   }
 
   useEffect(() => {
@@ -392,6 +420,8 @@ export default function SearchPage() {
         id: crypto.randomUUID(),
         label,
         bg: bloodGroup,
+        searchScope,
+        pincode: address.pincode,
         district: address.district,
         block: address.block,
         panchayat: address.panchayat,
@@ -408,8 +438,9 @@ export default function SearchPage() {
 
   function onLoadPreset(p: SavedSearchPreset) {
     setBloodGroup(p.bg);
+    setSearchScope(p.searchScope ?? "block");
     setAddress({
-      pincode: "",
+      pincode: p.pincode ?? "",
       district: p.district,
       block: p.block,
       panchayat: p.panchayat,
@@ -417,7 +448,6 @@ export default function SearchPage() {
     });
     setPreferredDay(p.preferredDay);
     setPreferredTimeSlot(p.preferredTimeSlot);
-
   }
 
   function onDeletePreset(id: string) {
@@ -476,9 +506,9 @@ export default function SearchPage() {
       <div className="rounded-2xl border bg-white/70 p-6 shadow-sm backdrop-blur">
         <h1 className="text-xl font-semibold">Find Eligible Donors</h1>
         <p className="mt-2 text-sm text-zinc-600">
-          Enter a West Bengal PIN or post office, select a blood group, and we list
-          admin-verified donors across your entire block (panchayat optional). 90-day
-          eligibility applies.
+          Enter a West Bengal PIN or village, choose how wide to search (PIN area, village,
+          or whole block), then pick a blood group. Only admin-verified, 90-day eligible
+          donors are shown.
         </p>
 
         <div className="mt-4 rounded-xl border border-zinc-200 bg-white/60 p-4 text-sm text-zinc-700">
@@ -494,6 +524,40 @@ export default function SearchPage() {
 
         <form className="mt-6 space-y-4" onSubmit={onSearch}>
           <div className="grid gap-4 sm:grid-cols-2">
+            <fieldset className="block sm:col-span-2">
+              <legend className="text-sm font-medium">Search area</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {DONOR_SEARCH_SCOPES.map((opt) => (
+                  <label
+                    key={opt.id}
+                    className={`flex cursor-pointer flex-col rounded-xl border px-3 py-2.5 text-sm transition ${
+                      searchScope === opt.id
+                        ? "border-rose-400 bg-rose-50/80 ring-2 ring-rose-500/20"
+                        : "border-zinc-200 bg-white/80 hover:border-zinc-300"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 font-semibold text-zinc-900">
+                      <input
+                        type="radio"
+                        name="searchScope"
+                        value={opt.id}
+                        checked={searchScope === opt.id}
+                        onChange={() => {
+                          setSearchScope(opt.id);
+                          lastAutoSearchKey.current = "";
+                        }}
+                        className="accent-rose-600"
+                      />
+                      {opt.label}
+                    </span>
+                    <span className="mt-1 text-xs leading-snug text-zinc-600">
+                      {opt.description}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
             <label className="block">
               <span className="text-sm font-medium">Blood Group</span>
               <select
@@ -503,9 +567,14 @@ export default function SearchPage() {
                   const next = e.target.value;
                   setBloodGroup(next);
                   const loc = normalizeWbAddress(address);
-                  if (next.trim() && loc.district.trim() && loc.block.trim()) {
+                  const canSearch =
+                    next.trim() &&
+                    loc.district.trim() &&
+                    (searchScope === "pincode" ||
+                      loc.block.trim());
+                  if (canSearch) {
                     lastAutoSearchKey.current = "";
-                    void runBlockDonorSearch({
+                    void runDonorSearch({
                       bloodGroupOverride: next,
                       addressOverride: loc,
                     });
@@ -531,7 +600,7 @@ export default function SearchPage() {
               onLocationResolved={handleLocationResolved}
               onError={setAddressError}
               panchayatMode="optional"
-              showVillage
+              showVillage={searchScope !== "pincode"}
             />
 
             <label className="block">
@@ -669,8 +738,8 @@ export default function SearchPage() {
         <div className="mt-5 space-y-2.5">
           {results.length === 0 && !loading ? (
             <div className="text-sm text-zinc-600">
-              {address.district.trim() && address.block.trim()
-                ? `No eligible donors found in ${address.block.trim()}, ${address.district.trim()} for this blood group.`
+              {address.district.trim()
+                ? `No eligible donors found for ${describeSearchScope(searchScope, address)} (${DONOR_SEARCH_SCOPES.find((s) => s.id === searchScope)?.label ?? "search"}).`
                 : "No eligible donors found. Enter a PIN and select a blood group."}
             </div>
           ) : null}

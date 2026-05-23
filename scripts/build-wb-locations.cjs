@@ -1,7 +1,8 @@
 /**
  * Builds src/data/wb-locations.json from:
- * - supabase/scripts/wb_locations_raw.txt (district / block / panchayat)
- * - india-pincode package (all West Bengal post offices)
+ * - Official WB districts (igod.gov.in)
+ * - WB JJM household survey village list (district / block / GP / village)
+ * - india-pincode (post office names + PIN codes)
  *
  * Run: node scripts/build-wb-locations.cjs
  */
@@ -11,128 +12,12 @@ const path = require("path");
 const { getIndiaPincode } = require("india-pincode");
 
 const ROOT = path.join(__dirname, "..");
-const RAW_PATH = path.join(ROOT, "supabase/scripts/wb_locations_raw.txt");
+const JJM_PATH = path.join(__dirname, "data/wb-jjm-villages.tsv");
+const OFFICIAL_PATH = path.join(ROOT, "src/data/official-wb-districts.json");
 const OUT_PATH = path.join(ROOT, "src/data/wb-locations.json");
 
-/** india-pincode district name → project district name */
-const DISTRICT_ALIASES = {
-  "24 PARAGANAS NORTH": "North 24 Parganas",
-  "24 PARAGANAS SOUTH": "South 24 Parganas",
-  HOOGHLY: "Hooghly",
-  MALDAH: "Malda",
-  "MEDINIPUR EAST": "Purba Medinipur",
-  "MEDINIPUR WEST": "Paschim Medinipur",
-  "DINAJPUR DAKSHIN": "Dakshin Dinajpur",
-  "DINAJPUR UTTAR": "Uttar Dinajpur",
-  COOCHBEHAR: "Cooch Behar",
-  BIRBHUM: "Birbhum",
-  BANKURA: "Bankura",
-  HOWRAH: "Howrah",
-  JALPAIGURI: "Jalpaiguri",
-  KALIMPONG: "Kalimpong",
-  DARJEELING: "Darjeeling",
-  PURULIA: "Purulia",
-  NADIA: "Nadia",
-  MURSHIDABAD: "Murshidabad",
-  "PURBA BARDHAMAN": "Purba Bardhaman",
-  "PASCHIM BARDHAMAN": "Paschim Bardhaman",
-  Jhargram: "Jhargram",
-  Alipurduar: "Alipurduar",
-  KOLKATA: "Kolkata",
-};
-
-/** Verified locality → block (extend as needed). */
-const MANUAL_LOCALITY_BLOCKS = [
-  { district: "Hooghly", locality: "Chuadanga", block: "Khanakul I" },
-  { district: "Hooghly", locality: "Daharkunda", block: "Khanakul I" },
-  { district: "Hooghly", locality: "Gujrat", block: "Khanakul I" },
-  { district: "Hooghly", locality: "Mayalbandipur", block: "Khanakul I" },
-  { district: "Hooghly", locality: "Kishorepur", block: "Khanakul I" },
-  { district: "Hooghly", locality: "Mahisgot", block: "Arambagh" },
-  { district: "Hooghly", locality: "Manikpat", block: "Arambagh" },
-  { district: "Hooghly", locality: "Baradangal", block: "Arambagh" },
-];
-
-/** Blocks listed under wrong district in raw text — reassign on import. */
-const RAW_BLOCK_DISTRICT_FIX = {
-  Berhampore: "Murshidabad",
-  Kandi: "Murshidabad",
-  Domkal: "Murshidabad",
-  Jalangi: "Murshidabad",
-  "Raninagar I": "Murshidabad",
-  "Raninagar II": "Murshidabad",
-};
-
-/** Extra admin blocks for districts missing from raw (subset; offices still added by locality match). */
-const EXTRA_DISTRICT_BLOCKS = {
-  Murshidabad: [
-    "Berhampore",
-    "Beldanga I",
-    "Beldanga II",
-    "Hariharpara",
-    "Naoda",
-    "Kandi",
-    "Khagra",
-    "Burwan",
-    "Bharatpur I",
-    "Bharatpur II",
-    "Rejinagar",
-    "Jalangi",
-    "Lalgola",
-    "Bhagawangola I",
-    "Bhagawangola II",
-    "Raninagar I",
-    "Raninagar II",
-    "Domkal",
-    "Nawda",
-    "Suti I",
-    "Suti II",
-    "Samserganj",
-    "Farakka",
-    "Raghunathganj I",
-    "Raghunathganj II",
-    "Sagardighi",
-  ],
-  Jhargram: [
-    "Jhargram",
-    "Binpur I",
-    "Binpur II",
-    "Gopiballavpur I",
-    "Gopiballavpur II",
-    "Jamboni",
-    "Nayagram",
-    "Sankrail",
-  ],
-  "Purba Bardhaman": [
-    "Kalna I",
-    "Kalna II",
-    "Katwa I",
-    "Katwa II",
-    "Manteswar",
-    "Purbasthali I",
-    "Purbasthali II",
-    "Bhagabanpur",
-    "Burdwan I",
-    "Burdwan II",
-    "Ausgram I",
-    "Ausgram II",
-    "Galsi I",
-    "Galsi II",
-  ],
-  "Paschim Bardhaman": [
-    "Asansol",
-    "Durgapur",
-    "Kanksa",
-    "Pandabeswar",
-    "Faridpur",
-    "Barabani",
-    "Salanpur",
-    "Raniganj",
-    "Jamuria",
-    "Ondal",
-  ],
-  Kolkata: ["Kolkata North", "Kolkata South", "Kolkata East", "Kolkata West"],
-};
+const officialWb = JSON.parse(fs.readFileSync(OFFICIAL_PATH, "utf8"));
+const OFFICIAL_DISTRICTS = officialWb.districts;
 
 function normalizeKey(value) {
   return String(value ?? "")
@@ -142,167 +27,341 @@ function normalizeKey(value) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+const OFFICIAL_KEYS = new Map(
+  OFFICIAL_DISTRICTS.map((d) => [normalizeKey(d), d]),
+);
+
+const DISTRICT_ALIASES = {
+  "24paraganasnorth": "North 24 Parganas",
+  "24paraganassouth": "South 24 Parganas",
+  north24parganas: "North 24 Parganas",
+  south24parganas: "South 24 Parganas",
+  hooghly: "Hooghly",
+  maldah: "Malda",
+  medinipureast: "Purba Medinipur",
+  medinipurwest: "Paschim Medinipur",
+  purbamedinipur: "Purba Medinipur",
+  paschimmedinipur: "Paschim Medinipur",
+  dinajpurdakshin: "Dakshin Dinajpur",
+  dinajpuruttar: "Uttar Dinajpur",
+  dakshindinajpur: "Dakshin Dinajpur",
+  uttardinajpur: "Uttar Dinajpur",
+  coochbehar: "Cooch Behar",
+  birbhum: "Birbhum",
+  bankura: "Bankura",
+  howrah: "Howrah",
+  jalpaiguri: "Jalpaiguri",
+  kalimpong: "Kalimpong",
+  darjeeling: "Darjeeling",
+  purulia: "Purulia",
+  nadia: "Nadia",
+  murshidabad: "Murshidabad",
+  purbabardhaman: "Purba Bardhaman",
+  paschimbardhaman: "Paschim Bardhaman",
+  jhargram: "Jhargram",
+  alipurduar: "Alipurduar",
+  kolkata: "Kolkata",
+};
+
+const BLOCK_ALIASES = {
+  arambag: "Arambagh",
+  arambagh: "Arambagh",
+};
+
+function normalizeOfficialDistrict(raw) {
+  const key = normalizeKey(raw);
+  if (!key) return "";
+  if (OFFICIAL_KEYS.has(key)) return OFFICIAL_KEYS.get(key);
+  if (DISTRICT_ALIASES[key]) return DISTRICT_ALIASES[key];
+  for (const [aliasKey, name] of Object.entries(DISTRICT_ALIASES)) {
+    if (key.includes(aliasKey) || aliasKey.includes(key)) return name;
+  }
+  for (const [officialKey, name] of OFFICIAL_KEYS) {
+    if (key.includes(officialKey) || officialKey.includes(key)) return name;
+  }
+  return "";
+}
+
 function titleCaseWords(value) {
   return String(value ?? "")
     .trim()
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 }
 
-function normalizeDistrictName(raw) {
-  const cleaned = String(raw ?? "")
-    .replace(/\s*\(.*?\)\s*/g, "")
+/** "Khanakul - I" → "Khanakul I", "Arambag" → "Arambagh" */
+function normalizeBlockName(raw) {
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) return "";
+  const collapsed = trimmed.replace(/\s*-\s*/g, " ").replace(/\s+/g, " ");
+  const key = normalizeKey(collapsed);
+  if (BLOCK_ALIASES[key]) return BLOCK_ALIASES[key];
+  return titleCaseWords(collapsed);
+}
+
+/** Strip census suffixes: "Abad Bhagabanpur (79)" → "Abad Bhagabanpur" */
+function cleanPlaceName(raw) {
+  return String(raw ?? "")
+    .trim()
+    .replace(/\s+B\.?O\.?$/i, "")
+    .replace(/\s+S\.?O\.?$/i, "")
+    .replace(/\s+H\.?O\.?$/i, "")
+    .replace(/\s*\([^)]*\)\s*$/g, "")
+    .replace(/\s+/g, " ")
     .trim();
-  const upper = cleaned.toUpperCase();
-  return DISTRICT_ALIASES[upper] ?? DISTRICT_ALIASES[cleaned] ?? titleCaseWords(cleaned);
 }
 
-function parseRawLocations(text) {
-  const rows = [];
-  let currentDistrict = "";
-  let currentBlock = "";
+function cleanPanchayatName(raw) {
+  const s = cleanPlaceName(raw);
+  if (!s) return "";
+  return titleCaseWords(s.replace(/-/g, " "));
+}
 
+/** Verified post office / village → admin block (PIN 712617 and similar). */
+const MANUAL_LOCALITY_BLOCKS = [
+  { district: "Hooghly", locality: "Chuadanga", block: "Khanakul I" },
+  { district: "Hooghly", locality: "Mahisgot", block: "Khanakul I" },
+  { district: "Hooghly", locality: "Gujrat", block: "Khanakul I" },
+  { district: "Hooghly", locality: "Mayalbandipur", block: "Khanakul I" },
+  { district: "Hooghly", locality: "Kishorepur", block: "Khanakul I" },
+  { district: "Hooghly", locality: "Niranjanbati", block: "Khanakul I" },
+  { district: "Hooghly", locality: "Daharkunda", block: "Arambagh" },
+  { district: "Hooghly", locality: "Manikpat", block: "Arambagh" },
+  { district: "Hooghly", locality: "Baradangal", block: "Arambagh" },
+  { district: "Hooghly", locality: "Baradongal", block: "Arambagh" },
+  { district: "Hooghly", locality: "Bara Dongal", block: "Arambagh" },
+  { district: "Hooghly", locality: "Atapur", block: "Arambagh" },
+  { district: "Hooghly", locality: "Basantabati", block: "Arambagh" },
+  { district: "Hooghly", locality: "Berabere", block: "Arambagh" },
+];
+
+/** Villages under a PIN that are not separate India Post offices (merged into lookup). */
+const MANUAL_PINCODE_LOCALITIES = [
+  {
+    pincode: "712617",
+    district: "Hooghly",
+    locality: "Atapur",
+    block: "Arambagh",
+    village: "Atapur",
+  },
+  {
+    pincode: "712617",
+    district: "Hooghly",
+    locality: "Basantabati",
+    block: "Arambagh",
+    village: "Basantabati",
+  },
+  {
+    pincode: "712617",
+    district: "Hooghly",
+    locality: "Baradongal",
+    block: "Arambagh",
+    village: "Bara Dongal",
+  },
+  {
+    pincode: "712617",
+    district: "Hooghly",
+    locality: "Berabere",
+    block: "Arambagh",
+    village: "Berabere",
+  },
+  {
+    pincode: "712617",
+    district: "Hooghly",
+    locality: "Niranjanbati",
+    block: "Khanakul I",
+    village: "Niranjanbati",
+  },
+];
+
+function parseJjmVillages(text) {
+  const rows = [];
   for (const line of text.split(/\r?\n/g)) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("🚀")) continue;
-    if (trimmed.toLowerCase().includes("full list")) continue;
+    if (!trimmed || trimmed.startsWith("|Sl")) continue;
+    const parts = trimmed.split("|").filter((p) => p !== "");
+    if (parts.length < 5) continue;
 
-    const districtMatch = trimmed.match(/(?:📍\s*)?district\s*:\s*(.+)$/i);
-    if (districtMatch) {
-      currentDistrict = normalizeDistrictName(districtMatch[1]);
-      currentBlock = "";
-      continue;
-    }
+    const district = normalizeOfficialDistrict(parts[1]);
+    const block = normalizeBlockName(parts[2]);
+    const panchayat = cleanPanchayatName(parts[3]);
+    const village = cleanPlaceName(parts[4]);
+    if (!district || !block || !village) continue;
 
-    const blockMatch = trimmed.match(/block\s*:\s*(.+)$/i);
-    if (blockMatch) {
-      const blockName = blockMatch[1].trim();
-      currentBlock = blockName;
-      if (RAW_BLOCK_DISTRICT_FIX[blockName]) {
-        currentDistrict = RAW_BLOCK_DISTRICT_FIX[blockName];
-      }
-      continue;
-    }
-
-    if (currentDistrict && currentBlock) {
-      rows.push({
-        district: currentDistrict,
-        block: currentBlock,
-        panchayat: trimmed,
-      });
-    }
+    rows.push({ district, block, panchayat, village });
   }
-
   return rows;
 }
 
-function buildDistrictTree(rawRows) {
+function buildDistrictTree(jjmRows) {
   const districtMap = new Map();
 
-  function ensureDistrict(name) {
-    if (!districtMap.has(name)) {
-      districtMap.set(name, { district: name, blocks: new Map() });
-    }
-    return districtMap.get(name);
+  for (const name of OFFICIAL_DISTRICTS) {
+    districtMap.set(name, { district: name, blocks: new Map() });
   }
 
   function ensureBlock(districtName, blockName) {
-    const d = ensureDistrict(districtName);
+    const d = districtMap.get(districtName);
+    if (!d) return null;
     if (!d.blocks.has(blockName)) {
-      d.blocks.set(blockName, { block: blockName, areas: new Set() });
+      d.blocks.set(blockName, {
+        block: blockName,
+        panchayats: new Map(),
+      });
     }
     return d.blocks.get(blockName);
   }
 
-  for (const row of rawRows) {
-    ensureBlock(row.district, row.block).areas.add(row.panchayat);
+  function ensurePanchayat(blockEntry, panchayatName) {
+    const key = panchayatName || "__unassigned__";
+    if (!blockEntry.panchayats.has(key)) {
+      blockEntry.panchayats.set(key, {
+        panchayat: panchayatName,
+        villages: new Set(),
+      });
+    }
+    return blockEntry.panchayats.get(key);
   }
 
-  for (const [districtName, blocks] of Object.entries(EXTRA_DISTRICT_BLOCKS)) {
-    for (const blockName of blocks) {
-      ensureBlock(districtName, blockName);
-    }
+  for (const row of jjmRows) {
+    if (!districtMap.has(row.district)) continue;
+    const blockEntry = ensureBlock(row.district, row.block);
+    if (!blockEntry) continue;
+    const pEntry = ensurePanchayat(blockEntry, row.panchayat);
+    pEntry.villages.add(row.village);
   }
 
   return districtMap;
 }
 
 function districtToExport(districtMap) {
-  return [...districtMap.values()]
-    .map((d) => ({
-      district: d.district,
-      blocks: [...d.blocks.values()]
+  return OFFICIAL_DISTRICTS.map((name) => {
+    const d = districtMap.get(name);
+    const blocks = d ? [...d.blocks.values()] : [];
+    return {
+      district: name,
+      blocks: blocks
         .map((b) => ({
           block: b.block,
-          areas: [...b.areas].sort((a, b) => a.localeCompare(b)),
+          panchayats: [...b.panchayats.values()]
+            .map((p) => ({
+              panchayat: p.panchayat,
+              villages: [...p.villages].sort((a, b) => a.localeCompare(b)),
+            }))
+            .sort((a, b) =>
+              (a.panchayat || "").localeCompare(b.panchayat || ""),
+            ),
+          areas: [...b.panchayats.values()].flatMap((p) => [
+            ...(p.panchayat ? [p.panchayat] : []),
+            ...p.villages,
+          ]),
         }))
         .sort((a, b) => a.block.localeCompare(b.block)),
-    }))
-    .sort((a, b) => a.district.localeCompare(b.district));
+    };
+  });
 }
 
-function findDistrictEntry(districtMap, districtName) {
-  return districtMap.get(districtName);
-}
+function buildLookupIndexes(jjmRows) {
+  /** districtKey -> { byVillage, byPanchayat } */
+  const byDistrict = new Map();
 
-function matchAreaToBlockInDistrict(districtEntry, locality) {
-  if (!districtEntry) return null;
-  const key = normalizeKey(locality);
-  if (!key) return null;
-
-  for (const { block, areas } of districtEntry.blocks.values()) {
-    const blockKey = normalizeKey(block);
-    if (key === blockKey || key.includes(blockKey) || blockKey.includes(key)) {
-      return block;
+  function districtIndex(district) {
+    const key = normalizeKey(district);
+    if (!byDistrict.has(key)) {
+      byDistrict.set(key, {
+        byVillage: new Map(),
+        byPanchayat: new Map(),
+      });
     }
-    for (const area of areas) {
-      const areaKey = normalizeKey(area);
-      if (key === areaKey || key.includes(areaKey) || areaKey.includes(key)) {
-        return block;
-      }
+    return byDistrict.get(key);
+  }
+
+  function addRecord(map, nameKey, record) {
+    if (!nameKey) return;
+    if (!map.has(nameKey)) map.set(nameKey, record);
+  }
+
+  for (const row of jjmRows) {
+    const idx = districtIndex(row.district);
+    const record = {
+      district: row.district,
+      block: row.block,
+      panchayat: row.panchayat,
+      village: row.village,
+    };
+
+    const villageKey = normalizeKey(row.village);
+    const panchayatKey = normalizeKey(row.panchayat);
+
+    addRecord(idx.byVillage, villageKey, record);
+    if (panchayatKey) addRecord(idx.byPanchayat, panchayatKey, record);
+
+    const villageWords = row.village.split(/\s+/).filter((w) => w.length >= 4);
+    for (const w of villageWords) {
+      addRecord(idx.byVillage, normalizeKey(w), record);
     }
   }
 
-  for (const blockName of districtEntry.blocks.keys()) {
-    const blockKey = normalizeKey(blockName);
-    if (key.includes(blockKey) || blockKey.includes(key)) {
-      return blockName;
-    }
-  }
+  return byDistrict;
+}
 
+function fuzzyFindInMap(map, localityKey) {
+  if (map.has(localityKey)) return map.get(localityKey);
+
+  for (const [key, record] of map) {
+    if (key.length < 4 || localityKey.length < 4) continue;
+    if (localityKey.includes(key) || key.includes(localityKey)) return record;
+  }
   return null;
 }
 
-function matchAreaToBlockByName(locality, blockNames) {
-  const key = normalizeKey(locality);
-  if (!key) return null;
-  for (const blockName of blockNames) {
-    const blockKey = normalizeKey(blockName);
-    if (key === blockKey || key.includes(blockKey) || blockKey.includes(key)) {
-      return blockName;
-    }
+function resolveLocality(district, locality, lookupIndexes) {
+  const districtKey = normalizeKey(district);
+  const localityKey = normalizeKey(cleanPlaceName(locality));
+  if (!districtKey || !localityKey) return null;
+
+  const manual = MANUAL_LOCALITY_BLOCKS.find(
+    (m) =>
+      normalizeKey(m.district) === districtKey &&
+      normalizeKey(m.locality) === localityKey,
+  );
+  if (manual) {
+    return {
+      district,
+      block: manual.block,
+      panchayat: cleanPlaceName(locality),
+      village: "",
+    };
   }
+
+  const idx = lookupIndexes.get(districtKey);
+  if (!idx) return null;
+
+  const fromVillage =
+    idx.byVillage.get(localityKey) ?? fuzzyFindInMap(idx.byVillage, localityKey);
+  if (fromVillage) return fromVillage;
+
+  const fromPanchayat =
+    idx.byPanchayat.get(localityKey) ??
+    fuzzyFindInMap(idx.byPanchayat, localityKey);
+  if (fromPanchayat) return fromPanchayat;
+
   return null;
-}
-
-function addAreaToBlock(districtMap, districtName, blockName, areaName) {
-  if (!districtName || !blockName || !areaName) return;
-  const d = districtMap.get(districtName) ?? {
-    district: districtName,
-    blocks: new Map(),
-  };
-  if (!districtMap.has(districtName)) districtMap.set(districtName, d);
-
-  if (!d.blocks.has(blockName)) {
-    d.blocks.set(blockName, { block: blockName, areas: new Set() });
-  }
-  d.blocks.get(blockName).areas.add(areaName.trim());
 }
 
 function main() {
-  const rawText = fs.readFileSync(RAW_PATH, "utf8");
-  const rawRows = parseRawLocations(rawText);
-  const districtMap = buildDistrictTree(rawRows);
+  if (!fs.existsSync(JJM_PATH)) {
+    throw new Error(
+      `Missing ${JJM_PATH}. Copy WB JJM village export (see scripts/data/README.md).`,
+    );
+  }
+
+  const jjmText = fs.readFileSync(JJM_PATH, "utf8");
+  const jjmRows = parseJjmVillages(jjmText);
+  const districtMap = buildDistrictTree(jjmRows);
+  const lookupIndexes = buildLookupIndexes(jjmRows);
 
   const pin = getIndiaPincode();
   const wbOffices = pin.getByState("WEST BENGAL", { limit: 200_000 });
@@ -312,68 +371,30 @@ function main() {
 
   const offices = wbOffices.data.data;
   const assignments = [];
-  const allBlockNames = new Set();
-  for (const d of districtMap.values()) {
-    for (const b of d.blocks.keys()) allBlockNames.add(b);
-  }
 
   for (const office of offices) {
-    const district = normalizeDistrictName(office.district);
-    const locality = String(office.area ?? "").trim();
+    const district = normalizeOfficialDistrict(office.district);
+    const locality = cleanPlaceName(office.area ?? "");
     const pincode = String(office.pincode ?? "").trim();
     if (!district || !locality) continue;
 
-    let block = null;
+    const resolved = resolveLocality(district, locality, lookupIndexes);
+    const block = resolved?.block ?? "";
+    const panchayat = resolved?.panchayat || locality;
+    const village =
+      resolved?.village &&
+      normalizeKey(resolved.village) !== normalizeKey(locality)
+        ? resolved.village
+        : resolved?.village || "";
 
-    const manual = MANUAL_LOCALITY_BLOCKS.find(
-      (m) =>
-        normalizeKey(m.district) === normalizeKey(district) &&
-        normalizeKey(m.locality) === normalizeKey(locality),
-    );
-    if (manual) block = manual.block;
-
-    if (!block) {
-      block = matchAreaToBlockInDistrict(findDistrictEntry(districtMap, district), locality);
-    }
-
-    if (!block && EXTRA_DISTRICT_BLOCKS[district]) {
-      block = matchAreaToBlockByName(locality, EXTRA_DISTRICT_BLOCKS[district]);
-    }
-
-    if (!block) {
-      block = matchAreaToBlockByName(locality, [...allBlockNames]);
-    }
-
-    assignments.push({ district, block: block ?? "", locality, pincode });
-  }
-
-  // Pincode consensus: if most offices on a PIN share a block, apply to the rest in that PIN.
-  const byPin = new Map();
-  for (const a of assignments) {
-    if (!a.pincode || !a.district) continue;
-    const k = `${a.pincode}|${normalizeKey(a.district)}`;
-    if (!byPin.has(k)) byPin.set(k, []);
-    byPin.get(k).push(a);
-  }
-
-  for (const group of byPin.values()) {
-    const counts = new Map();
-    for (const a of group) {
-      if (!a.block) continue;
-      counts.set(a.block, (counts.get(a.block) ?? 0) + 1);
-    }
-    if (counts.size === 0) continue;
-    const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
-    if (counts.get(best) < 2 && group.length > 3) continue;
-    for (const a of group) {
-      if (!a.block) a.block = best;
-    }
-  }
-
-  for (const a of assignments) {
-    if (a.block) {
-      addAreaToBlock(districtMap, a.district, a.block, a.locality);
-    }
+    assignments.push({
+      district,
+      block,
+      locality,
+      panchayat,
+      village,
+      pincode,
+    });
   }
 
   const districts = districtToExport(districtMap);
@@ -381,44 +402,94 @@ function main() {
   const pincodeByDigits = {};
 
   for (const a of assignments) {
-    const district = a.district;
-    const panchayat = a.locality;
-    const block = a.block || matchAreaToBlockInDistrict(findDistrictEntry(districtMap, district), panchayat) || "";
-
-    const locKey = `${normalizeKey(district)}|${normalizeKey(panchayat)}`;
-    if (block && !localityByKey[locKey]) {
-      localityByKey[locKey] = { district, block, panchayat };
+    const locKey = `${normalizeKey(a.district)}|${normalizeKey(a.locality)}`;
+    if (a.block && !localityByKey[locKey]) {
+      localityByKey[locKey] = {
+        district: a.district,
+        block: a.block,
+        panchayat: a.panchayat,
+        village: a.village,
+      };
     }
 
     if (!a.pincode) continue;
     if (!pincodeByDigits[a.pincode]) pincodeByDigits[a.pincode] = [];
     pincodeByDigits[a.pincode].push({
-      district,
-      block,
-      panchayat,
+      district: a.district,
+      block: a.block,
+      panchayat: a.panchayat || a.locality,
+      village: a.village,
     });
   }
 
-  // Dedupe pincode entries
+  for (const extra of MANUAL_PINCODE_LOCALITIES) {
+    const pin = extra.pincode;
+    const locality = extra.locality;
+    const locKey = `${normalizeKey(extra.district)}|${normalizeKey(locality)}`;
+    if (!localityByKey[locKey]) {
+      localityByKey[locKey] = {
+        district: extra.district,
+        block: extra.block,
+        panchayat: locality,
+        village: extra.village || locality,
+      };
+    }
+    if (!pincodeByDigits[pin]) pincodeByDigits[pin] = [];
+    const exists = pincodeByDigits[pin].some(
+      (row) =>
+        normalizeKey(row.panchayat) === normalizeKey(locality) ||
+        normalizeKey(row.village) === normalizeKey(extra.village || locality),
+    );
+    if (!exists) {
+      pincodeByDigits[pin].push({
+        district: extra.district,
+        block: extra.block,
+        panchayat: locality,
+        village: extra.village || locality,
+      });
+    }
+  }
+
   for (const pin of Object.keys(pincodeByDigits)) {
     const seen = new Set();
     pincodeByDigits[pin] = pincodeByDigits[pin].filter((row) => {
-      const k = `${row.district}|${row.block}|${row.panchayat}`;
+      const k = `${row.district}|${row.block}|${row.panchayat}|${row.village}`;
       if (seen.has(k)) return false;
       seen.add(k);
       return true;
     });
   }
 
+  const withBlock = assignments.filter((a) => a.block).length;
+  const uniqueBlocks = new Set(
+    jjmRows.map((r) => `${r.district}|${r.block}`),
+  ).size;
+  const uniquePanchayats = new Set(
+    jjmRows.filter((r) => r.panchayat).map((r) => `${r.district}|${r.panchayat}`),
+  ).size;
+
   const payload = {
-    version: 2,
+    version: 4,
     generatedAt: new Date().toISOString(),
+    sources: {
+      districts:
+        "https://github.com/KTBsomen/Indian-state-district-json (igod.gov.in)",
+      villages:
+        "WB Jal Jeevan Mission household survey (jjm.wbphed.gov.in) — district/block/GP/village",
+      postOffices: "india-pincode npm package",
+    },
     stats: {
-      districts: districts.length,
+      officialDistricts: OFFICIAL_DISTRICTS.length,
+      jjmVillages: jjmRows.length,
+      uniqueBlocks,
+      uniquePanchayats,
       postOffices: offices.length,
+      assignmentsWithBlock: withBlock,
+      blockCoveragePct: Math.round((withBlock / offices.length) * 1000) / 10,
       localityKeys: Object.keys(localityByKey).length,
       pincodes: Object.keys(pincodeByDigits).length,
     },
+    officialDistricts: OFFICIAL_DISTRICTS,
     districts,
     localityByKey,
     pincodeByDigits,

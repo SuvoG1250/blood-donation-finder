@@ -91,6 +91,7 @@ export default function WbAddressFields({
         district: office.district,
         block: office.block,
         panchayat: office.panchayat,
+        village: office.village?.trim() || office.panchayat || addr.village,
       });
       onChange(next);
       setPickerOffices([]);

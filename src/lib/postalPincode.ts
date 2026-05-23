@@ -1,7 +1,10 @@
 /** West Bengal pincode data — local india-pincode DB with optional remote fallback. */
 
 import { getIndiaPincode, type PostOffice as IndiaPostOffice } from "india-pincode";
-import { resolveWbBlock } from "@/lib/resolveWbBlock";
+import { normalizeLocationKey } from "@/lib/locationKeys";
+import { normalizeOfficialWbDistrict } from "@/lib/officialWbDistricts";
+import { resolveWbLocation } from "@/lib/resolveWbBlock";
+import { WB_PINCODE_INDEX, type WbPincodeOfficeEntry } from "@/lib/wbLocations";
 
 export const WB_STATE_LABEL = "West Bengal";
 
@@ -31,6 +34,7 @@ export type WbNormalizedAddress = {
   district: string;
   block: string;
   panchayat: string;
+  village?: string;
 };
 
 const LEGACY_API_BASE = "https://api.postalpincode.in";
@@ -48,40 +52,52 @@ export function isWestBengalState(state: string | null | undefined): boolean {
   return s === "west bengal" || s === "wb";
 }
 
-export function normalizeBlock(po: PostalPostOffice): string {
-  const district = (po.District ?? "").trim();
+function resolveFromPostOffice(po: PostalPostOffice): WbNormalizedAddress {
+  const district =
+    normalizeOfficialWbDistrict(po.District) || (po.District ?? "").trim();
   const locality = (po.Name ?? "").trim();
-  const resolved = resolveWbBlock(district, locality, {
+  const resolved = resolveWbLocation(district, locality, {
     postalBlock: po.Block,
     division: po.Division,
     taluk: po.Description ?? undefined,
     pincode: po.Pincode,
   });
-  if (resolved) return resolved;
 
-  const block = (po.Block ?? "").trim();
-  const districtKey = district.toLowerCase().replace(/\s+/g, "");
-  if (
-    block &&
-    block.toUpperCase() !== "NA" &&
-    block.toLowerCase().replace(/\s+/g, "") !== districtKey
-  ) {
-    return block;
+  let block = resolved.block;
+  if (!block) {
+    const postalBlock = (po.Block ?? "").trim();
+    const districtKey = district.toLowerCase().replace(/\s+/g, "");
+    if (
+      postalBlock &&
+      postalBlock.toUpperCase() !== "NA" &&
+      postalBlock.toLowerCase().replace(/\s+/g, "") !== districtKey
+    ) {
+      block = postalBlock;
+    }
   }
 
-  return "";
+  return {
+    pincode: (po.Pincode ?? "").trim(),
+    district,
+    block,
+    panchayat: resolved.panchayat || locality,
+    village: resolved.village,
+  };
+}
+
+export function normalizeBlock(po: PostalPostOffice): string {
+  return resolveFromPostOffice(po).block;
 }
 
 export function postOfficeToAddress(
   po: PostalPostOffice,
   pincodeFallback = "",
 ): WbNormalizedAddress {
-  return {
-    pincode: (po.Pincode ?? pincodeFallback).trim(),
-    district: (po.District ?? "").trim(),
-    block: normalizeBlock(po),
-    panchayat: (po.Name ?? "").trim(),
-  };
+  const addr = resolveFromPostOffice(po);
+  if (!addr.pincode && pincodeFallback) {
+    addr.pincode = pincodeFallback.trim();
+  }
+  return addr;
 }
 
 export function filterWestBengalOffices(offices: PostalPostOffice[]): PostalPostOffice[] {
@@ -104,13 +120,14 @@ function titleCaseWords(value: string): string {
 
 function indiaRecordToPostal(po: IndiaPostOffice): PostalPostOffice {
   const division = (po.division ?? "").trim();
-  const district = titleCaseWords(po.district);
+  const district =
+    normalizeOfficialWbDistrict(po.district) || titleCaseWords(po.district);
   const locality = (po.area ?? "").trim();
   return {
     Name: locality,
     District: district,
     State: titleCaseWords(po.state),
-    Block: resolveWbBlock(district, locality, { division, pincode: po.pincode }),
+    Block: resolveWbLocation(district, locality, { division, pincode: po.pincode }).block,
     Division: division,
     Region: (po.region ?? "").trim(),
     Circle: (po.circle ?? "").trim(),
@@ -131,6 +148,45 @@ function dedupeOffices(offices: PostalPostOffice[]): PostalPostOffice[] {
     out.push(po);
   }
   return out;
+}
+
+function indexEntryToPostal(entry: WbPincodeOfficeEntry, pincode: string): PostalPostOffice {
+  const label = (entry.village || entry.panchayat).trim();
+  return {
+    Name: label,
+    District: entry.district,
+    State: WB_STATE_LABEL,
+    Block: entry.block,
+    Pincode: pincode,
+    BranchType: "Village",
+    DeliveryStatus: "",
+    Country: "India",
+  };
+}
+
+/** Add verified villages/localities from wb-locations when India Post has no BO for them. */
+function mergeWbPincodeExtras(
+  pincode: string,
+  offices: PostalPostOffice[],
+): PostalPostOffice[] {
+  const extras = WB_PINCODE_INDEX[pincode] ?? [];
+  if (extras.length === 0) return offices;
+
+  const seen = new Set(
+    offices.map((o) => normalizeLocationKey(o.Name ?? "")),
+  );
+  const merged = [...offices];
+
+  for (const entry of extras) {
+    if (!entry.block) continue;
+    const label = (entry.village || entry.panchayat).trim();
+    const key = normalizeLocationKey(label);
+    if (!key || seen.has(key)) continue;
+    merged.push(indexEntryToPostal(entry, pincode));
+    seen.add(key);
+  }
+
+  return dedupeOffices(merged);
 }
 
 function fetchPincodeOfficesLocal(pincode: string): PostalPostOffice[] {
@@ -218,13 +274,15 @@ async function fetchPincodeOfficesRemote(pincode: string): Promise<PostalPostOff
   return dedupeOffices(
     filterWestBengalOffices(
       rows.map((row) => {
-        const district = titleCaseWords(row.district ?? "");
+        const district =
+          normalizeOfficialWbDistrict(row.district ?? "") ||
+          titleCaseWords(row.district ?? "");
         const locality = (row.office ?? "").replace(/\s+B\.?O\.?$/i, "").trim();
         return {
         Name: locality,
         District: district,
         State: titleCaseWords(row.state ?? ""),
-        Block: resolveWbBlock(district, locality, { pincode: row.pincode ?? pincode }),
+        Block: resolveWbLocation(district, locality, { pincode: row.pincode ?? pincode }).block,
         Pincode: (row.pincode ?? pincode).trim(),
         BranchType: row.officeType ?? "",
         DeliveryStatus: row.delivery ? "Delivery" : "Non-Delivery",
@@ -239,17 +297,18 @@ export async function fetchPincodeOffices(pincode: string): Promise<PostalPostOf
   if (digits.length !== 6) return [];
 
   const local = fetchPincodeOfficesLocal(digits);
-  if (local.length > 0) return local;
+  if (local.length > 0) return mergeWbPincodeExtras(digits, local);
 
   try {
     const remote = await fetchPincodeOfficesRemote(digits);
-    if (remote.length > 0) return remote;
+    if (remote.length > 0) return mergeWbPincodeExtras(digits, remote);
   } catch {
     // try legacy API next
   }
 
   try {
-    return await fetchPincodeOfficesLegacy(digits);
+    const legacy = await fetchPincodeOfficesLegacy(digits);
+    return mergeWbPincodeExtras(digits, legacy);
   } catch {
     throw new Error("PIN code lookup failed. Try again.");
   }

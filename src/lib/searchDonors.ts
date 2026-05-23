@@ -4,6 +4,8 @@ import {
   type DonorSearchRow,
   type FilterDonorSearchParams,
 } from "@/lib/filterDonorSearch";
+import type { DonorSearchScope } from "@/lib/donorSearchScope";
+import { parseDonorSearchScope } from "@/lib/donorSearchScope";
 import {
   normalizeWbAddress,
   validateWbAddressForSearch,
@@ -11,6 +13,7 @@ import {
 } from "@/lib/wbAddress";
 
 export type { DonorSearchRow };
+export type { DonorSearchScope };
 
 export type SearchDonorsParams = FilterDonorSearchParams;
 
@@ -20,7 +23,7 @@ export type SearchDonorsResult = {
 };
 
 const SAFE_DONOR_SELECT =
-  "user_id,name,photo_object_path,blood_group,district,block,panchayat,village,last_donation_date,contact_number,preferred_days,preferred_time_slots";
+  "user_id,name,photo_object_path,blood_group,district,block,panchayat,village,pincode,last_donation_date,contact_number,preferred_days,preferred_time_slots";
 
 async function searchViaApi(params: SearchDonorsParams): Promise<SearchDonorsResult | null> {
   const paths = ["/blood/api/search/donors", "/api/search/donors"];
@@ -55,10 +58,17 @@ async function searchViaClient(
 ): Promise<SearchDonorsResult> {
   const bloodGroup = params.bloodGroup.trim();
   const address = normalizeWbAddress(params.address);
+  const scope = params.searchScope ?? "block";
   const district = address.district.trim();
   const block = address.block.trim();
 
-  if (district && block && !address.panchayat.trim()) {
+  if (
+    scope === "block" &&
+    district &&
+    block &&
+    !address.panchayat.trim() &&
+    !address.village.trim()
+  ) {
     const rpcRes = await supabase.rpc("search_donors_by_block", {
       p_blood_group: bloodGroup,
       p_district: district,
@@ -73,6 +83,7 @@ async function searchViaClient(
         donors: filterDonorSearchRows(rows, {
           bloodGroup,
           address,
+          searchScope: scope,
           preferredDay: params.preferredDay,
           preferredTimeSlot: params.preferredTimeSlot,
         }),
@@ -105,6 +116,7 @@ async function searchViaClient(
   const donors = filterDonorSearchRows(rows, {
     bloodGroup,
     address,
+    searchScope: scope,
     preferredDay: params.preferredDay,
     preferredTimeSlot: params.preferredTimeSlot,
   });
@@ -114,7 +126,7 @@ async function searchViaClient(
 
 /**
  * Search verified, eligible donors by blood group + West Bengal address.
- * Block-wide when panchayat is empty (all donors in the block after PIN lookup).
+ * Scope: pincode (all areas under PIN), village, or block.
  */
 export async function searchDonorsByAddress(
   supabase: SupabaseClient,
@@ -126,7 +138,8 @@ export async function searchDonorsByAddress(
   }
 
   const address = normalizeWbAddress(params.address);
-  const validation = validateWbAddressForSearch(address);
+  const searchScope = params.searchScope ?? "block";
+  const validation = validateWbAddressForSearch(address, { searchScope });
   if (!validation.ok) {
     return { donors: [], error: validation.error ?? "Invalid address." };
   }
@@ -134,6 +147,7 @@ export async function searchDonorsByAddress(
   const apiResult = await searchViaApi({
     bloodGroup,
     address,
+    searchScope,
     preferredDay: params.preferredDay,
     preferredTimeSlot: params.preferredTimeSlot,
   });
@@ -152,13 +166,16 @@ export async function searchDonorsByAddress(
 export function buildDonorSearchQueryParams(opts: {
   bloodGroup: string;
   address: WbAddressValue;
+  searchScope?: DonorSearchScope;
   preferredDay?: string;
   preferredTimeSlot?: string;
 }): URLSearchParams {
   const params = new URLSearchParams();
   const bg = opts.bloodGroup.trim();
   const a = normalizeWbAddress(opts.address);
+  const scope = opts.searchScope ?? "block";
   if (bg) params.set("bg", bg);
+  if (scope !== "block") params.set("scope", scope);
   if (a.district.trim()) params.set("d", a.district.trim());
   if (a.block.trim()) params.set("b", a.block.trim());
   if (a.panchayat.trim()) params.set("p", a.panchayat.trim());
@@ -172,12 +189,14 @@ export function buildDonorSearchQueryParams(opts: {
 export function parseDonorSearchParams(search: string): {
   bloodGroup: string;
   address: WbAddressValue;
+  searchScope: DonorSearchScope;
   preferredDay: string;
   preferredTimeSlot: string;
 } {
   const params = new URLSearchParams(search);
   return {
     bloodGroup: params.get("bg") ?? "",
+    searchScope: parseDonorSearchScope(params.get("scope")),
     address: normalizeWbAddress({
       pincode: params.get("pin") ?? "",
       district: params.get("d") ?? "",
