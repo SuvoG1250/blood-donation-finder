@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "build:wb-locations": "node scripts/build-wb-locations.cjs",
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run build:wb-locations && next build",
     "start": "next start",
     "lint": "eslint"
   },

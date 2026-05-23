@@ -55,6 +55,7 @@ export function normalizeBlock(po: PostalPostOffice): string {
     postalBlock: po.Block,
     division: po.Division,
     taluk: po.Description ?? undefined,
+    pincode: po.Pincode,
   });
   if (resolved) return resolved;
 
@@ -109,7 +110,7 @@ function indiaRecordToPostal(po: IndiaPostOffice): PostalPostOffice {
     Name: locality,
     District: district,
     State: titleCaseWords(po.state),
-    Block: resolveWbBlock(district, locality, { division }),
+    Block: resolveWbBlock(district, locality, { division, pincode: po.pincode }),
     Division: division,
     Region: (po.region ?? "").trim(),
     Circle: (po.circle ?? "").trim(),
@@ -223,7 +224,7 @@ async function fetchPincodeOfficesRemote(pincode: string): Promise<PostalPostOff
         Name: locality,
         District: district,
         State: titleCaseWords(row.state ?? ""),
-        Block: resolveWbBlock(district, locality),
+        Block: resolveWbBlock(district, locality, { pincode: row.pincode ?? pincode }),
         Pincode: (row.pincode ?? pincode).trim(),
         BranchType: row.officeType ?? "",
         DeliveryStatus: row.delivery ? "Delivery" : "Non-Delivery",
