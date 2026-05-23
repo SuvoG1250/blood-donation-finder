@@ -1,6 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  fetchFirstOk,
+  pincodeApiPath,
+  postOfficeApiPath,
+} from "@/lib/addressApiPaths";
 import { WB_STATE_LABEL, type WbNormalizedAddress } from "@/lib/postalPincode";
 import {
   emptyWbAddress,
@@ -107,7 +112,7 @@ export default function WbAddressFields({
     setPinBusy(true);
     setError(null);
     try {
-      const resp = await fetch(`/api/address/pincode/${digits}`);
+      const resp = await fetchFirstOk(pincodeApiPath(digits));
       const data = (await resp.json()) as PincodeApiResp;
       if (!resp.ok) {
         setError(data.error ?? "PIN code lookup failed.");
@@ -144,7 +149,7 @@ export default function WbAddressFields({
     setSearchBusy(true);
     setError(null);
     try {
-      const resp = await fetch(`/api/address/postoffice?q=${encodeURIComponent(q)}`);
+      const resp = await fetchFirstOk(postOfficeApiPath(q));
       const data = (await resp.json()) as PostOfficeApiResp;
       if (!resp.ok) {
         setError(data.error ?? "Post office search failed.");
